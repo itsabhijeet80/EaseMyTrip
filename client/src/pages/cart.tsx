@@ -1,14 +1,12 @@
-import { useState } from "react";
-import { ShoppingCart, CreditCard, Shield, RotateCcw, Phone, Gem, Trash2 } from "lucide-react";
+import { ShoppingCart, CreditCard, Shield, RotateCcw, Phone, Trash2, Gem } from "lucide-react";
 import { useTripStore } from "@/hooks/use-trip-store";
 import { Button } from "@/components/ui/button";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 export default function Cart() {
-  const { cartItems, setCartItems, getTotalCost, currentTrip } = useTripStore();
+  const { cartItems, setCartItems, getTotalCost, currentTrip, upgradeAdded, setUpgradeAdded } = useTripStore();
   const queryClient = useQueryClient();
-  const [upgradeAdded, setUpgradeAdded] = useState(false);
 
   const removeItemMutation = useMutation({
     mutationFn: (itemId: string) => api.deleteCartItem(itemId),
@@ -36,7 +34,7 @@ export default function Cart() {
 
   return (
     <>
-      <main className="flex-grow overflow-y-auto custom-scrollbar p-6 relative">
+      <main className="flex-grow overflow-y-auto custom-scrollbar p-6 relative pb-32">
         {/* Header */}
         <header className="text-center mb-6">
           <ShoppingCart className="w-8 h-8 text-primary mx-auto mb-2" />
@@ -131,17 +129,19 @@ export default function Cart() {
             </div>
           </div>
 
-          {/* Spacer for sticky upgrade card */}
-          <div className="h-32"></div>
-
-          {/* Checkout Button */}
-          <Button
-            className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold py-4 px-6 shadow-lg transition-all duration-200 transform hover:scale-[1.02] hover:shadow-xl mt-8"
-            data-testid="checkout-button"
-          >
-            <CreditCard className="w-5 h-5 mr-2" />
-            Proceed to Secure Checkout
-          </Button>
+          {/* Checkout Button with Total Cost */}
+          <div className="mt-8">
+            <Button
+              className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold py-4 px-6 shadow-lg transition-all duration-200 transform hover:scale-[1.02] hover:shadow-xl flex items-center justify-between"
+              data-testid="checkout-button"
+            >
+              <span className="flex items-center">
+                <CreditCard className="w-5 h-5 mr-2" />
+                Proceed to Secure Checkout
+              </span>
+              <span className="text-xl font-bold" data-testid="checkout-total-cost">₹{finalTotal}</span>
+            </Button>
+          </div>
 
           {/* Trust Indicators */}
           <div className="flex items-center justify-center space-x-4 mt-4 text-xs text-muted-foreground">
@@ -158,37 +158,41 @@ export default function Cart() {
               24/7 Support
             </div>
           </div>
+
         </>
       )}
+      </main>
 
-      {/* Sticky Upgrade Card - Bottom Left within scrollable area */}
       {includedItems.length > 0 && (
-        <div className="fixed bottom-20 left-0 z-10 max-w-[280px] ml-6">
-          <div className="bg-card/80 backdrop-blur-md border border-border/50 rounded-xl p-3 shadow-xl">
-            <div className="flex items-start space-x-2">
-              <Gem className="w-4 h-4 text-secondary mt-0.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-foreground text-xs mb-1">Upgrade Your Experience</p>
-                <p className="text-[10px] text-muted-foreground mb-2 leading-tight">
-                  Premium Ocean View Suite with balcony & butler
-                </p>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] text-muted-foreground font-medium">+₹480</span>
-                  <Button
-                    size="sm"
-                    className="bg-primary text-primary-foreground text-[10px] font-medium py-1 px-2 h-auto hover:bg-primary/90"
-                    data-testid="add-upgrade-button"
-                    onClick={() => setUpgradeAdded(!upgradeAdded)}
-                  >
-                    {upgradeAdded ? "Remove" : "Add"}
-                  </Button>
+        <div className="fixed left-0 bottom-24 z-30 pointer-events-none">
+          <div className="ml-2 pointer-events-auto w-[220px] rounded-2xl border-2 border-secondary/30 bg-gradient-to-br from-card/85 to-card/70 backdrop-blur-md shadow-2xl hover:shadow-secondary/20 transition-all duration-300 hover:scale-105">
+            <div className="p-3.5">
+              <div className="flex items-start gap-2 mb-2">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-secondary/20 to-secondary/10 flex items-center justify-center">
+                  <Gem className="w-4 h-4 text-secondary" />
                 </div>
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-foreground">Upgrade Your Experience</p>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
+                Premium Ocean View Suite with balcony & butler
+              </p>
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
+                <span className="text-xs text-muted-foreground font-semibold">+₹{upgradePrice}</span>
+                <Button
+                  size="sm"
+                  className="bg-gradient-to-r from-secondary to-secondary/90 hover:from-secondary/90 hover:to-secondary text-secondary-foreground text-[11px] font-bold py-1.5 px-3 h-auto rounded-full shadow-lg hover:shadow-xl transition-all"
+                  data-testid="add-upgrade-button"
+                  onClick={() => setUpgradeAdded(!upgradeAdded)}
+                >
+                  {upgradeAdded ? "✓ Added" : "+ Add"}
+                </Button>
               </div>
             </div>
           </div>
         </div>
       )}
-      </main>
     </>
   );
 }

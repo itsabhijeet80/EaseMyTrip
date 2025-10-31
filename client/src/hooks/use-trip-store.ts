@@ -13,20 +13,20 @@ interface TripStore {
   cartItems: CartItem[];
   isLoading: boolean;
   isChatOpen: boolean;
-  isAIOptionsOpen: boolean;
-  isAITalkOpen: boolean;
+  aiMode: 'voice' | 'text';
   selectedDay: number;
   pendingAction: PendingAction | null;
   modificationHistory: any[];
+  upgradeAdded: boolean;
   
   setCurrentTrip: (trip: Trip | null) => void;
   setCartItems: (items: CartItem[]) => void;
   setIsLoading: (loading: boolean) => void;
   setIsChatOpen: (open: boolean) => void;
-  setIsAIOptionsOpen: (open: boolean) => void;
-  setIsAITalkOpen: (open: boolean) => void;
+  setAIMode: (mode: 'voice' | 'text') => void;
   setSelectedDay: (day: number) => void;
   setPendingAction: (action: PendingAction | null) => void;
+  setUpgradeAdded: (added: boolean) => void;
   
   updateCartItem: (id: string, updates: Partial<CartItem>) => void;
   removeCartItem: (id: string) => void;
@@ -42,20 +42,20 @@ export const useTripStore = create<TripStore>((set, get) => ({
   cartItems: [],
   isLoading: false,
   isChatOpen: false,
-  isAIOptionsOpen: false,
-  isAITalkOpen: false,
+  aiMode: 'voice',
   selectedDay: 1,
   pendingAction: null,
   modificationHistory: [],
+  upgradeAdded: false,
   
   setCurrentTrip: (trip) => set({ currentTrip: trip }),
   setCartItems: (items) => set({ cartItems: items }),
   setIsLoading: (loading) => set({ isLoading: loading }),
   setIsChatOpen: (open) => set({ isChatOpen: open }),
-  setIsAIOptionsOpen: (open) => set({ isAIOptionsOpen: open }),
-  setIsAITalkOpen: (open) => set({ isAITalkOpen: open }),
+  setAIMode: (mode) => set({ aiMode: mode }),
   setSelectedDay: (day) => set({ selectedDay: day }),
   setPendingAction: (action) => set({ pendingAction: action }),
+  setUpgradeAdded: (added) => set({ upgradeAdded: added }),
   
   updateCartItem: (id, updates) => set((state) => ({
     cartItems: state.cartItems.map(item => 

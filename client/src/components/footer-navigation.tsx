@@ -13,7 +13,8 @@ const navItems = [
 export default function FooterNavigation() {
   const [location, setLocation] = useLocation();
   const itemCount = useTripStore(state => state.getItemCount());
-  const setIsAITalkOpen = useTripStore(state => state.setIsAITalkOpen);
+  const setIsChatOpen = useTripStore(state => state.setIsChatOpen);
+  const setAIMode = useTripStore(state => state.setAIMode);
 
   return (
     <footer className="bg-card border-t border-border sticky bottom-0 z-20">
@@ -42,7 +43,10 @@ export default function FooterNavigation() {
 
         {/* AI Assistant Button - Centered and Elevated */}
         <button
-          onClick={() => setIsAITalkOpen(true)}
+          onClick={() => {
+            setAIMode('voice');
+            setIsChatOpen(true);
+          }}
           className="flex flex-col items-center -mt-6 transition-all duration-200 hover:scale-110"
           data-testid="nav-ai-assistant"
         >

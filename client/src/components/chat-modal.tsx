@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, CheckCircle, AlertCircle, Undo2, Sparkles } from "lucide-react";
+import { X, Send, Mic, Keyboard, CheckCircle, AlertCircle, Undo2 } from "lucide-react";
 import { useTripStore } from "@/hooks/use-trip-store";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 
 interface ChatMessage {
   id: string;
@@ -20,47 +21,119 @@ export default function ChatModal() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
-      text: "Hi! I'm your AI travel assistant. I can help you modify your trip, answer questions, or suggest alternatives. Try saying 'make it cheaper' or 'add a spa day'!",
+      text: "Hi! I'm your AI travel assistant. I can help you modify your trip or answer questions. Try saying 'make it cheaper' or 'add a spa day'.",
       isUser: false,
       timestamp: new Date(),
     }
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [voiceResponse, setVoiceResponse] = useState("");
+  const [showVoiceResponse, setShowVoiceResponse] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
-  
-  const { 
-    isChatOpen, 
-    setIsChatOpen, 
-    currentTrip, 
+
+  const {
+    isChatOpen,
+    setIsChatOpen,
+    aiMode,
+    setAIMode,
+    currentTrip,
     setCurrentTrip,
-    pendingAction, 
+    pendingAction,
     setPendingAction,
     addModificationToHistory,
     undoLastModification,
     modificationHistory
   } = useTripStore();
 
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  const {
+    isListening,
+    transcript,
+    startListening,
+    stopListening,
+    resetTranscript,
+    isSupported,
+    error: speechError
+  } = useSpeechRecognition();
 
-  // Detect action from message
+  useEffect(() => {
+    if (aiMode === 'text') {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, aiMode]);
+
+  useEffect(() => {
+    if (!isChatOpen) {
+      stopListening();
+      return;
+    }
+
+    if (aiMode === 'voice') {
+      setVoiceResponse("");
+      setShowVoiceResponse(false);
+      if (isSupported && !isListening) {
+        startListening();
+      }
+    } else {
+      stopListening();
+    }
+
+    return () => {
+      stopListening();
+    };
+  }, [isChatOpen, aiMode]);
+
+  useEffect(() => {
+    if (!isChatOpen || aiMode !== 'voice') return;
+
+    if (!isListening && transcript.trim().length > 3) {
+      detectActionMutation.mutate(transcript.trim());
+      resetTranscript();
+    }
+  }, [isListening, transcript, aiMode, isChatOpen]);
+
+  useEffect(() => {
+    if (aiMode === 'text') {
+      setShowVoiceResponse(false);
+      stopListening();
+    }
+  }, [aiMode]);
+
+  const handleClose = () => {
+    stopListening();
+    setIsChatOpen(false);
+    setAIMode('voice');
+  };
+
+  const speakResponse = (text: string) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const provideVoiceFeedback = (text: string) => {
+    if (aiMode !== 'voice' || !text) return;
+    setVoiceResponse(text);
+    setShowVoiceResponse(true);
+    speakResponse(text);
+  };
+
   const detectActionMutation = useMutation({
     mutationFn: (message: string) => api.detectAction(message, currentTrip?.id),
-    onSuccess: (data) => {
+    onSuccess: (data, originalMessage) => {
       if (data.hasAction && data.needsConfirmation) {
-        // Store pending action
         setPendingAction({
           action: data.action,
           params: data.params,
           confirmationMessage: data.confirmationMessage,
           reasoning: data.reasoning
         });
-        
-        // Add confirmation message to chat
+
         const confirmMsg: ChatMessage = {
           id: Date.now().toString(),
           text: data.confirmationMessage,
@@ -70,30 +143,28 @@ export default function ChatModal() {
           actionStatus: 'pending'
         };
         setMessages(prev => [...prev, confirmMsg]);
+
+        provideVoiceFeedback(data.confirmationMessage);
       } else if (data.hasAction && !data.needsConfirmation) {
-        // Execute immediately
         modifyTripMutation.mutate({
           action: data.action,
           params: data.params
         });
       } else {
-        // No action, just chat
-        chatMutation.mutate(inputValue);
+        chatMutation.mutate(originalMessage);
       }
       setIsProcessing(false);
     },
-    onError: () => {
+    onError: (_, originalMessage) => {
       setIsProcessing(false);
-      chatMutation.mutate(inputValue);
+      chatMutation.mutate(originalMessage);
     }
   });
 
-  // Execute trip modification
   const modifyTripMutation = useMutation({
     mutationFn: ({ action, params }: any) => 
       api.modifyTrip(currentTrip!.id, action, params),
     onSuccess: (data) => {
-      // Save previous trip to history
       if (currentTrip) {
         addModificationToHistory({
           timestamp: new Date(),
@@ -102,24 +173,22 @@ export default function ChatModal() {
           newTrip: data.trip
         });
       }
-      
-      // Update current trip
+
       setCurrentTrip(data.trip);
-      
-      // Add success message with changes
+
       const successMsg: ChatMessage = {
         id: Date.now().toString(),
-        text: `✓ Done! ${data.changes.join(', ')}. ${data.suggestion || ''}`,
+        text: `✓ Done! ${data.changes.join(', ')}${data.suggestion ? `. ${data.suggestion}` : ''}`,
         isUser: false,
         timestamp: new Date(),
         actionStatus: 'confirmed'
       };
       setMessages(prev => [...prev, successMsg]);
-      
-      // Clear pending action
+
+      provideVoiceFeedback(successMsg.text);
+
       setPendingAction(null);
-      
-      // Invalidate cart items
+
       if (currentTrip) {
         queryClient.invalidateQueries({ queryKey: ["/api/trips", currentTrip.id, "cart"] });
       }
@@ -133,11 +202,11 @@ export default function ChatModal() {
         actionStatus: 'rejected'
       };
       setMessages(prev => [...prev, errorMsg]);
+      provideVoiceFeedback(errorMsg.text);
       setPendingAction(null);
     }
   });
 
-  // Regular chat (no action detected)
   const chatMutation = useMutation({
     mutationFn: (message: string) => api.chat(message, currentTrip?.id),
     onSuccess: (data) => {
@@ -148,6 +217,8 @@ export default function ChatModal() {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, aiMessage]);
+
+      provideVoiceFeedback(data.response);
     },
   });
 
@@ -155,7 +226,6 @@ export default function ChatModal() {
     const message = inputValue.trim();
     if (!message || isProcessing) return;
 
-    // Add user message
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       text: message,
@@ -166,13 +236,11 @@ export default function ChatModal() {
     setInputValue("");
     setIsProcessing(true);
 
-    // Detect if message contains an action
     detectActionMutation.mutate(message);
   };
 
   const handleConfirmAction = () => {
     if (!pendingAction) return;
-    
     modifyTripMutation.mutate({
       action: pendingAction.action,
       params: pendingAction.params
@@ -188,6 +256,7 @@ export default function ChatModal() {
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, rejectMsg]);
+    provideVoiceFeedback(rejectMsg.text);
   };
 
   const handleUndo = () => {
@@ -199,6 +268,7 @@ export default function ChatModal() {
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, undoMsg]);
+    provideVoiceFeedback(undoMsg.text);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -218,162 +288,258 @@ export default function ChatModal() {
   if (!isChatOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end backdrop-blur-sm transition-all duration-300 slide-in">
-      <div className="bg-card w-full max-w-lg mx-auto rounded-t-2xl shadow-2xl h-[85%] flex flex-col border-t border-border">
-        {/* Header */}
-        <header className="p-4 border-b border-border flex justify-between items-center bg-gradient-to-r from-primary/10 to-secondary/10 rounded-t-2xl">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center shadow-md">
-              <Sparkles className="h-5 w-5 text-primary-foreground" />
-            </div>
+    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+      <div className="absolute inset-0 bg-black/30" onClick={handleClose} />
+      <div className="relative px-4 pb-6 pointer-events-none flex justify-center">
+        <div className="pointer-events-auto w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card shadow-2xl transition-all duration-200">
+          <header className="flex items-center justify-between px-4 py-3 border-b border-border/60 bg-background/80 backdrop-blur">
             <div>
-              <h2 className="text-lg font-bold text-foreground">Smart Assistant</h2>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-muted-foreground">Ready to help</span>
-              </div>
+              <p className="text-sm font-semibold text-foreground">AI Assistant</p>
+              <p className="text-xs text-muted-foreground">
+                {aiMode === 'voice' ? (isListening ? 'Listening…' : isSupported ? 'Tap mic to speak' : 'Voice not supported') : 'Type your request'}
+              </p>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {modificationHistory.length > 0 && (
+            <div className="flex items-center gap-1">
+              <div className="flex items-center bg-muted rounded-full p-1 text-xs">
+                <button
+                  className={cn(
+                    "flex items-center gap-1 rounded-full px-3 py-1 transition-all",
+                    aiMode === 'voice' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"
+                  )}
+                  onClick={() => setAIMode('voice')}
+                >
+                  <Mic className="h-3.5 w-3.5" />
+                  Voice
+                </button>
+                <button
+                  className={cn(
+                    "flex items-center gap-1 rounded-full px-3 py-1 transition-all",
+                    aiMode === 'text' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"
+                  )}
+                  onClick={() => setAIMode('text')}
+                >
+                  <Keyboard className="h-3.5 w-3.5" />
+                  Text
+                </button>
+              </div>
+              {modificationHistory.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleUndo}
+                  className="text-muted-foreground hover:text-foreground"
+                  title="Undo last change"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleUndo}
+                onClick={handleClose}
                 className="text-muted-foreground hover:text-foreground"
-                title="Undo last change"
+                data-testid="close-chat-button"
               >
-                <Undo2 className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsChatOpen(false)}
-              className="text-muted-foreground hover:text-foreground"
-              data-testid="close-chat-button"
-            >
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
-        </header>
+            </div>
+          </header>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={cn(
-                "flex",
-                message.isUser ? "justify-end" : "justify-start"
-              )}
-            >
-              <div
-                className={cn(
-                  "max-w-[80%] rounded-2xl px-4 py-2 transition-all duration-200",
-                  message.isUser
-                    ? "bg-primary text-primary-foreground rounded-br-sm"
-                    : message.isAction
-                    ? "bg-secondary/20 border border-secondary text-foreground rounded-bl-sm"
-                    : "bg-muted text-foreground rounded-bl-sm"
-                )}
-              >
-                {message.actionStatus === 'confirmed' && (
-                  <CheckCircle className="w-4 h-4 inline mr-1 text-green-500" />
-                )}
-                {message.actionStatus === 'rejected' && (
-                  <AlertCircle className="w-4 h-4 inline mr-1 text-red-500" />
-                )}
-                <p className="text-sm whitespace-pre-wrap break-words">{message.text}</p>
-                <span className="text-xs opacity-70 mt-1 block">
-                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-            </div>
-          ))}
-          
-          {/* Action Confirmation Buttons */}
-          {pendingAction && (
-            <div className="flex justify-center gap-3 py-2">
-              <Button
-                onClick={handleConfirmAction}
-                disabled={modifyTripMutation.isPending}
-                className="bg-green-600 hover:bg-green-700 text-white"
-                size="sm"
-              >
-                <CheckCircle className="w-4 h-4 mr-1" />
-                {modifyTripMutation.isPending ? "Applying..." : "Confirm"}
-              </Button>
-              <Button
-                onClick={handleRejectAction}
-                variant="outline"
-                size="sm"
-                disabled={modifyTripMutation.isPending}
-              >
-                Cancel
-              </Button>
-            </div>
-          )}
-          
-          {(isProcessing || chatMutation.isPending) && (
-            <div className="flex justify-start">
-              <div className="bg-muted rounded-2xl px-4 py-3 rounded-bl-sm">
-                <div className="flex space-x-2">
-                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          {aiMode === 'voice' ? (
+            <div className="p-4 space-y-4">
+              {(speechError || !isSupported) && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-destructive">Voice not available</p>
+                    <p className="text-xs text-destructive/80 mt-1">
+                      {speechError || "Your browser doesn't support speech recognition. Switch to text mode instead."}
+                    </p>
+                  </div>
                 </div>
+              )}
+
+              <button
+                onClick={() => (isListening ? stopListening() : startListening())}
+                className={cn(
+                  "mx-auto flex h-20 w-20 items-center justify-center rounded-full transition-all",
+                  isListening ? "bg-red-500 shadow-lg shadow-red-500/40" : "bg-primary shadow-lg hover:bg-primary/90"
+                )}
+                disabled={!isSupported}
+                data-testid="voice-record-button"
+              >
+                <Mic className="h-8 w-8 text-primary-foreground" />
+              </button>
+
+              {transcript && (
+                <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-sm text-foreground">
+                  “{transcript}”
+                </div>
+              )}
+
+              {(isProcessing || chatMutation.isPending || detectActionMutation.isPending) && (
+                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  Thinking…
+                </div>
+              )}
+
+              {showVoiceResponse && voiceResponse && (
+                <div className="rounded-lg border border-border/60 bg-card/80 p-4">
+                  <p className="text-sm text-foreground">{voiceResponse}</p>
+                </div>
+              )}
+
+              {pendingAction && (
+                <div className="flex items-center justify-center gap-3">
+                  <Button
+                    onClick={handleConfirmAction}
+                    disabled={modifyTripMutation.isPending}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    size="sm"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-1" />
+                    {modifyTripMutation.isPending ? "Applying…" : "Confirm"}
+                  </Button>
+                  <Button
+                    onClick={handleRejectAction}
+                    variant="outline"
+                    size="sm"
+                    disabled={modifyTripMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
+
+              <button
+                onClick={() => setAIMode('text')}
+                className="w-full rounded-full border border-border bg-background px-4 py-3 text-left text-sm text-muted-foreground hover:text-foreground"
+              >
+                Tap to type instead…
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col" style={{ maxHeight: '65vh' }}>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      "flex",
+                      message.isUser ? "justify-end" : "justify-start"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "max-w-[80%] rounded-2xl px-4 py-2 text-sm",
+                        message.isUser
+                          ? "bg-primary text-primary-foreground"
+                          : message.isAction
+                          ? "bg-secondary/20 border border-secondary"
+                          : "bg-muted text-foreground"
+                      )}
+                    >
+                      {message.actionStatus === 'confirmed' && (
+                        <CheckCircle className="w-4 h-4 inline mr-1 text-green-500" />
+                      )}
+                      {message.actionStatus === 'rejected' && (
+                        <AlertCircle className="w-4 h-4 inline mr-1 text-red-500" />
+                      )}
+                      <p className="whitespace-pre-wrap break-words">{message.text}</p>
+                      <span className="mt-1 block text-[10px] opacity-60">
+                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {pendingAction && (
+                  <div className="flex justify-center gap-3 pt-2">
+                    <Button
+                      onClick={handleConfirmAction}
+                      disabled={modifyTripMutation.isPending}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      size="sm"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      {modifyTripMutation.isPending ? "Applying…" : "Confirm"}
+                    </Button>
+                    <Button
+                      onClick={handleRejectAction}
+                      variant="outline"
+                      size="sm"
+                      disabled={modifyTripMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+                {(isProcessing || chatMutation.isPending) && (
+                  <div className="flex justify-start">
+                    <div className="rounded-2xl bg-muted px-4 py-3">
+                      <div className="flex space-x-2">
+                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
+
+              {messages.length <= 2 && (
+                <div className="px-4 pb-2">
+                  <p className="text-xs text-muted-foreground mb-2">Quick actions:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {quickActions.map((action) => (
+                      <Button
+                        key={action}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setInputValue(action);
+                          setTimeout(() => handleSendMessage(), 100);
+                        }}
+                        className="text-xs h-auto py-1 px-3 rounded-full"
+                      >
+                        {action}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <footer className="border-t border-border bg-muted/20 p-4">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    placeholder="Ask me to modify your trip…"
+                    className="flex-1 rounded-full bg-background"
+                    disabled={isProcessing || modifyTripMutation.isPending}
+                    data-testid="chat-input"
+                  />
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={!inputValue.trim() || isProcessing || modifyTripMutation.isPending}
+                    className="rounded-full w-10 h-10 p-0"
+                    data-testid="send-button"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+                <button
+                  onClick={() => setAIMode('voice')}
+                  className="mt-3 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Prefer talking? Switch to voice
+                </button>
+              </footer>
             </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
-
-        {/* Quick Actions */}
-        {messages.length <= 2 && (
-          <div className="px-4 pb-2">
-            <p className="text-xs text-muted-foreground mb-2">Quick actions:</p>
-            <div className="flex flex-wrap gap-2">
-              {quickActions.map((action) => (
-                <Button
-                  key={action}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setInputValue(action);
-                    setTimeout(() => handleSendMessage(), 100);
-                  }}
-                  className="text-xs h-auto py-1 px-3 rounded-full"
-                >
-                  {action}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Input */}
-        <footer className="p-4 border-t border-border bg-muted/20">
-          <div className="flex items-center space-x-2">
-            <Input
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyPress}
-              placeholder="Ask me to modify your trip..."
-              className="flex-1 rounded-full bg-background"
-              disabled={isProcessing || modifyTripMutation.isPending}
-              data-testid="chat-input"
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isProcessing || modifyTripMutation.isPending}
-              className="rounded-full w-10 h-10 p-0"
-              data-testid="send-button"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-        </footer>
       </div>
     </div>
   );
