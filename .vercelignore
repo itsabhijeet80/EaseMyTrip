@@ -1,0 +1,29 @@
+# Development files
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Documentation
+README.md
+DEPLOYMENT_GUIDE.md
+ENV_CONFIG.md
+
+# Other deployment configs
+render.yaml
+netlify.toml
+
+# Assets (if large and not needed)
+# attached_assets
+

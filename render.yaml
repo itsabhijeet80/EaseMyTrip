@@ -1,0 +1,22 @@
+services:
+  # Backend API Service
+  - type: web
+    name: ease-backend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false  # Set this in Render dashboard
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false  # Set this in Render dashboard
+    scaling:
+      minInstances: 1
+      maxInstances: 3
