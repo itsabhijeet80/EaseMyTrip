@@ -14,6 +14,8 @@ import LoadingOverlay from "@/components/loading-overlay";
 import FooterNavigation from "@/components/footer-navigation";
 import FloatingChatButton from "@/components/floating-chat-button";
 import ChatModal from "@/components/chat-modal";
+import AIOptionsModal from "@/components/ai-options-modal";
+import AITalkModal from "@/components/ai-talk-modal";
 
 function Router() {
   return (
@@ -31,7 +33,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="max-w-md mx-auto min-h-screen flex flex-col relative">
+        <div className="max-w-lg mx-auto min-h-screen flex flex-col relative">
           
           {/* Loading Overlay */}
           <LoadingOverlay />
@@ -44,6 +46,12 @@ function App() {
           
           {/* Footer Navigation */}
           <FooterNavigation />
+          
+          {/* AI Talk Modal */}
+          <AITalkModal />
+          
+          {/* AI Options Modal */}
+          <AIOptionsModal />
           
           {/* Chat Modal */}
           <ChatModal />

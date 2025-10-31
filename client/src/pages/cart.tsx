@@ -35,13 +35,14 @@ export default function Cart() {
   const finalTotal = totalCost - priceBreakdown.discount + priceBreakdown.taxes + (upgradeAdded ? upgradePrice : 0);
 
   return (
-    <main className="flex-grow overflow-y-auto custom-scrollbar p-6">
-      {/* Header */}
-      <header className="text-center mb-6">
-        <ShoppingCart className="w-8 h-8 text-primary mx-auto mb-2" />
-        <h1 className="text-2xl font-bold text-foreground">Your Trip Summary</h1>
-        <p className="text-muted-foreground">Review your selected items</p>
-      </header>
+    <>
+      <main className="flex-grow overflow-y-auto custom-scrollbar p-6 relative">
+        {/* Header */}
+        <header className="text-center mb-6">
+          <ShoppingCart className="w-8 h-8 text-primary mx-auto mb-2" />
+          <h1 className="text-2xl font-bold text-foreground">Your Trip Summary</h1>
+          <p className="text-muted-foreground">Review your selected items</p>
+        </header>
 
       {/* Cart Items */}
       <div className="space-y-3" data-testid="cart-items">
@@ -130,34 +131,8 @@ export default function Cart() {
             </div>
           </div>
 
-          {/* Upgrade Recommendations */}
-          <div className="mt-8">
-            <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center">
-              <Gem className="w-5 h-5 text-secondary mr-2" />
-              Upgrade Your Experience
-            </h2>
-            <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
-              <div className="flex items-start space-x-3">
-                <Gem className="w-5 h-5 text-secondary mt-1" />
-                <div className="flex-1">
-                  <p className="font-semibold text-foreground">Premium Ocean View Suite</p>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Upgrade to our best room with private balcony and butler service for just $120 more per night.
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">+$480 total</span>
-                    <Button
-                      className="bg-primary text-primary-foreground text-sm font-medium py-2 px-4 hover:bg-primary/90"
-                      data-testid="add-upgrade-button"
-                      onClick={() => setUpgradeAdded(!upgradeAdded)}
-                    >
-                      {upgradeAdded ? "Remove Upgrade" : "Add Upgrade"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Spacer for sticky upgrade card */}
+          <div className="h-32"></div>
 
           {/* Checkout Button */}
           <Button
@@ -185,6 +160,35 @@ export default function Cart() {
           </div>
         </>
       )}
-    </main>
+
+      {/* Sticky Upgrade Card - Bottom Left within scrollable area */}
+      {includedItems.length > 0 && (
+        <div className="fixed bottom-20 left-0 z-10 max-w-[280px] ml-6">
+          <div className="bg-card/80 backdrop-blur-md border border-border/50 rounded-xl p-3 shadow-xl">
+            <div className="flex items-start space-x-2">
+              <Gem className="w-4 h-4 text-secondary mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-foreground text-xs mb-1">Upgrade Your Experience</p>
+                <p className="text-[10px] text-muted-foreground mb-2 leading-tight">
+                  Premium Ocean View Suite with balcony & butler
+                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-muted-foreground font-medium">+₹480</span>
+                  <Button
+                    size="sm"
+                    className="bg-primary text-primary-foreground text-[10px] font-medium py-1 px-2 h-auto hover:bg-primary/90"
+                    data-testid="add-upgrade-button"
+                    onClick={() => setUpgradeAdded(!upgradeAdded)}
+                  >
+                    {upgradeAdded ? "Remove" : "Add"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </main>
+    </>
   );
 }

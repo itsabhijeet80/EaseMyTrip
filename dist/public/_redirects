@@ -1,0 +1,5 @@
+# Redirect all API calls to backend
+/api/* https://your-render-backend-url.onrender.com/api/:splat 200
+
+# SPA fallback - redirect all other requests to index.html
+/* /index.html 200

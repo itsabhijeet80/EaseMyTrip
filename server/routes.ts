@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { tripRequestSchema, vibesRequestSchema, chatMessageSchema } from "@shared/schema";
-import { generateVibes, generateTripPlan, chatWithAI } from "./services/gemini";
+import { generateVibes, generateTripPlan, chatWithAI, detectTripAction, executeModification, analyzeBudgetOptimization, generateSmartRecommendations, generateUserInsights } from "./services/gemini";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -132,6 +132,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error in chat:", error);
       res.status(500).json({ error: "Failed to process chat message" });
+    }
+  });
+
+  // Detect action from message
+  app.post("/api/detect-action", async (req, res) => {
+    try {
+      const { message, tripId } = req.body;
+      
+      let tripContext = null;
+      if (tripId) {
+        tripContext = await storage.getTrip(tripId);
+      }
+      
+      const action = await detectTripAction(message, tripContext);
+      res.json(action);
+    } catch (error) {
+      console.error("Error detecting action:", error);
+      res.status(500).json({ error: "Failed to detect action" });
+    }
+  });
+
+  // Execute trip modification
+  app.post("/api/trips/:id/modify", async (req, res) => {
+    try {
+      const { action, params } = req.body;
+      const tripId = req.params.id;
+      
+      const trip = await storage.getTrip(tripId);
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+      
+      const result = await executeModification(action, params, trip);
+      
+      // Update the trip in storage
+      const updatedTrip = await storage.updateTrip(tripId, result.modifiedTrip);
+      
+      res.json({ 
+        trip: updatedTrip, 
+        changes: result.changes,
+        suggestion: result.suggestion 
+      });
+    } catch (error) {
+      console.error("Error modifying trip:", error);
+      res.status(500).json({ error: "Failed to modify trip" });
+    }
+  });
+
+  // Budget optimization
+  app.post("/api/trips/:id/optimize-budget", async (req, res) => {
+    try {
+      const tripId = req.params.id;
+      
+      const trip = await storage.getTrip(tripId);
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+      
+      const optimization = await analyzeBudgetOptimization(trip);
+      res.json(optimization);
+    } catch (error) {
+      console.error("Error optimizing budget:", error);
+      res.status(500).json({ error: "Failed to optimize budget" });
+    }
+  });
+
+  // Smart recommendations
+  app.post("/api/trips/:id/recommendations", async (req, res) => {
+    try {
+      const tripId = req.params.id;
+      const { dayNumber } = req.body;
+      
+      const trip = await storage.getTrip(tripId);
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+      
+      const recommendations = await generateSmartRecommendations(trip, dayNumber);
+      res.json(recommendations);
+    } catch (error) {
+      console.error("Error generating recommendations:", error);
+      res.status(500).json({ error: "Failed to generate recommendations" });
+    }
+  });
+
+  // User insights
+  app.post("/api/user/insights", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      
+      // Get user's trip history
+      const trips = await storage.getTripsByUser(userId || "default-user");
+      
+      const userProfile = {
+        trips: trips.length,
+        tripHistory: trips.slice(0, 5), // Last 5 trips
+        preferences: {
+          // Mock data for demo
+          favoriteThemes: ["Beach & Chill", "Adventure Sports"],
+          averageBudget: 8000,
+          destinations: trips.map(t => t.to)
+        }
+      };
+      
+      const insights = await generateUserInsights(userProfile);
+      res.json(insights);
+    } catch (error) {
+      console.error("Error generating user insights:", error);
+      res.status(500).json({ error: "Failed to generate user insights" });
     }
   });
 

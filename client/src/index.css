@@ -174,6 +174,35 @@
     background: hsl(var(--primary));
   }
 
+  /* Beautiful vibe scrollbar */
+  .vibe-scrollbar::-webkit-scrollbar {
+    height: 6px;
+  }
+  
+  .vibe-scrollbar::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.3);
+    border-radius: 10px;
+    margin-left: 8px;
+    margin-right: 8px;
+  }
+  
+  .vibe-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--secondary)));
+    border-radius: 10px;
+    transition: all 0.3s ease;
+  }
+  
+  .vibe-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, hsl(var(--primary) / 0.8), hsl(var(--secondary) / 0.8));
+    transform: scaleY(1.2);
+  }
+  
+  /* Firefox scrollbar */
+  .vibe-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary)) hsl(var(--muted) / 0.3);
+  }
+
   /* Budget slider styling */
   input[type="range"] {
     -webkit-appearance: none;
@@ -214,5 +243,19 @@
     border: 2px solid white;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     cursor: pointer;
+  }
+
+  /* Wave animation for voice assistant */
+  @keyframes wave {
+    0%, 100% {
+      transform: scaleY(0.3);
+    }
+    50% {
+      transform: scaleY(1);
+    }
+  }
+  
+  .animate-wave {
+    animation: wave 0.8s ease-in-out infinite;
   }
 }
