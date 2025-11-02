@@ -33,6 +33,13 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     recognitionInstance.continuous = true;
     recognitionInstance.interimResults = true;
     recognitionInstance.lang = 'en-US';
+    recognitionInstance.maxAlternatives = 1;
+
+    recognitionInstance.onstart = () => {
+      console.log('Speech recognition started');
+      setError(null);
+      setIsListening(true);
+    };
 
     recognitionInstance.onresult = (event: any) => {
       let interimTranscript = '';
@@ -47,17 +54,27 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
         }
       }
 
-      setTranscript(finalTranscript || interimTranscript);
+      const currentTranscript = finalTranscript || interimTranscript;
+      setTranscript(currentTranscript);
     };
 
     recognitionInstance.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error);
+      
+      // Don't set error for 'no-speech' if user hasn't spoken yet
+      if (event.error === 'no-speech' && !transcript.trim()) {
+        // This is normal when user hasn't started speaking
+        return;
+      }
+      
       setError(`Recognition error: ${event.error}`);
       setIsListening(false);
     };
 
     recognitionInstance.onend = () => {
+      console.log('Speech recognition ended');
       setIsListening(false);
+      // Don't auto-restart - let user control it
     };
 
     setRecognition(recognitionInstance);

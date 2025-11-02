@@ -9,6 +9,7 @@ PORT=10000
 DATABASE_URL=your_neon_database_connection_string
 SESSION_SECRET=your_random_session_secret_key
 GEMINI_API_KEY=your_gemini_api_key
+ELEVENLABS_API_KEY=your_elevenlabs_api_key
 ```
 
 ### Frontend (Netlify)
@@ -32,6 +33,12 @@ VITE_API_URL=https://your-render-backend-url.onrender.com
 1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
 2. Create a new API key
 3. Copy the generated key
+
+### ELEVENLABS_API_KEY
+1. Go to [ElevenLabs](https://elevenlabs.io/)
+2. Sign up or log in
+3. Go to your profile settings
+4. Copy your API key from the API section
 
 ### VITE_API_URL
 - This will be your Render backend URL

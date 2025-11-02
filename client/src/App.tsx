@@ -12,8 +12,9 @@ import NotFound from "@/pages/not-found";
 
 import LoadingOverlay from "@/components/loading-overlay";
 import FooterNavigation from "@/components/footer-navigation";
-import FloatingChatButton from "@/components/floating-chat-button";
 import ChatModal from "@/components/chat-modal";
+import ViewModeToggle from "@/components/view-mode-toggle";
+import { useTripStore } from "@/hooks/use-trip-store";
 
 function Router() {
   return (
@@ -28,26 +29,32 @@ function Router() {
 }
 
 function App() {
+  const viewMode = useTripStore(state => state.viewMode);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="max-w-lg mx-auto min-h-screen flex flex-col relative">
-          
-          {/* Loading Overlay */}
-          <LoadingOverlay />
-          
-          {/* Main Content */}
-          <Router />
-          
-          {/* Floating Chat Button */}
-          <FloatingChatButton />
-          
-          {/* Footer Navigation */}
-          <FooterNavigation />
-          
-          {/* Chat Modal */}
-          <ChatModal />
-          
+        <div className="w-full min-h-screen flex justify-center relative z-10">
+          {/* Main Container - Responsive based on view mode */}
+          <div className={viewMode === 'desktop' 
+            ? "w-full max-w-7xl mx-auto min-h-screen flex flex-col relative"
+            : "w-full max-w-lg mx-auto min-h-screen flex flex-col relative"
+          }>
+            {/* Loading Overlay */}
+            <LoadingOverlay />
+            
+            {/* View Mode Toggle - Positioned below header area */}
+            <ViewModeToggle />
+            
+            {/* Main Content */}
+            <Router />
+            
+            {/* Footer Navigation */}
+            <FooterNavigation />
+            
+            {/* Chat Modal */}
+            <ChatModal />
+          </div>
         </div>
         <Toaster />
       </TooltipProvider>

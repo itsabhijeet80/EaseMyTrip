@@ -20,12 +20,19 @@ function setCache(key: string, data: any) {
 
 export const api = {
   generateVibes: async (destination: string) => {
-    const cacheKey = `vibes-${destination}`;
+    // Check client-side cache first (additional layer of caching)
+    const cacheKey = `vibes-${destination.toLowerCase().trim()}`;
     const cached = getCached(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      console.log("Using cached vibes from client cache for:", destination);
+      return cached;
+    }
     
+    console.log("Calling API for vibes with destination:", destination);
     const response = await apiRequest("POST", "/api/vibes", { destination });
     const data = await response.json();
+    console.log("Received vibes:", data);
+    // Cache the result for 5 minutes on client side (backend also caches for 1 hour)
     setCache(cacheKey, data);
     return data;
   },
@@ -60,8 +67,34 @@ export const api = {
     return response.json();
   },
 
+  textToSpeech: async (text: string, voiceId?: string): Promise<Blob> => {
+    const res = await fetch("/api/text-to-speech", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, voiceId }),
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      const text = (await res.text()) || res.statusText;
+      throw new Error(`${res.status}: ${text}`);
+    }
+
+    return res.blob();
+  },
+
   detectAction: async (message: string, tripId?: string) => {
     const response = await apiRequest("POST", "/api/detect-action", { message, tripId });
+    return response.json();
+  },
+
+  detectItineraryPlanning: async (message: string, conversationHistory?: string[]) => {
+    const response = await apiRequest("POST", "/api/detect-itinerary-planning", { message, conversationHistory });
+    return response.json();
+  },
+
+  extractTripDetails: async (message: string, existingDetails?: any, destination?: string) => {
+    const response = await apiRequest("POST", "/api/extract-trip-details", { message, existingDetails, destination });
     return response.json();
   },
 

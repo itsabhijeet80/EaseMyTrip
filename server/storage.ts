@@ -16,6 +16,7 @@ export interface IStorage {
   // Cart Items
   getCartItems(tripId: string): Promise<CartItem[]>;
   createCartItem(item: InsertCartItem): Promise<CartItem>;
+  createCartItemsBatch(items: InsertCartItem[]): Promise<CartItem[]>;
   updateCartItem(id: string, item: Partial<CartItem>): Promise<CartItem | undefined>;
   deleteCartItem(id: string): Promise<boolean>;
 }
@@ -80,21 +81,99 @@ export class MemStorage implements IStorage {
 
   // Cart Items
   async getCartItems(tripId: string): Promise<CartItem[]> {
-    return Array.from(this.cartItems.values()).filter(item => item.tripId === tripId);
+    const allItems = Array.from(this.cartItems.values());
+    const filtered = allItems.filter(item => item.tripId === tripId);
+    console.log(`[Storage] getCartItems for trip ${tripId}: Found ${filtered.length} items out of ${allItems.length} total`);
+    if (filtered.length === 0 && allItems.length > 0) {
+      console.log(`[Storage] All trip IDs in storage:`, [...new Set(allItems.map(i => i.tripId))]);
+    }
+    return filtered;
   }
 
   async createCartItem(itemData: InsertCartItem): Promise<CartItem> {
     const id = randomUUID();
+    // Validate required fields
+    if (!itemData.tripId) {
+      throw new Error('tripId is required for cart items');
+    }
+    if (!itemData.type) {
+      throw new Error('type is required for cart items');
+    }
+    if (!itemData.title) {
+      throw new Error('title is required for cart items');
+    }
+    if (!itemData.details) {
+      throw new Error('details is required for cart items');
+    }
+    
     const item: CartItem = { 
       ...itemData, 
       id,
-      tripId: itemData.tripId || null,
+      tripId: itemData.tripId,
+      type: itemData.type,
+      title: itemData.title,
+      details: itemData.details,
       provider: itemData.provider || null,
+      price: typeof itemData.price === 'number' ? itemData.price : (parseInt(String(itemData.price)) || 0),
       included: itemData.included ?? true,
       dayNumber: itemData.dayNumber || null
     };
+    
     this.cartItems.set(id, item);
+    const totalItems = this.cartItems.size;
+    console.log(`[Storage] Created cart item: ${id}`);
+    console.log(`  - Trip: ${itemData.tripId}, Day: ${itemData.dayNumber}, Type: ${itemData.type}`);
+    console.log(`  - Title: ${itemData.title.substring(0, 50)}`);
+    console.log(`  - Total cart items in storage: ${totalItems}`);
+    
+    // Verify it was stored
+    const stored = this.cartItems.get(id);
+    if (!stored) {
+      throw new Error(`Failed to store cart item ${id}`);
+    }
+    
     return item;
+  }
+
+  async createCartItemsBatch(itemsData: InsertCartItem[]): Promise<CartItem[]> {
+    const items: CartItem[] = [];
+    
+    for (const itemData of itemsData) {
+      const id = randomUUID();
+      
+      // Validate required fields
+      if (!itemData.tripId) {
+        throw new Error('tripId is required for cart items');
+      }
+      if (!itemData.type) {
+        throw new Error('type is required for cart items');
+      }
+      if (!itemData.title) {
+        throw new Error('title is required for cart items');
+      }
+      if (!itemData.details) {
+        throw new Error('details is required for cart items');
+      }
+      
+      const item: CartItem = { 
+        ...itemData, 
+        id,
+        tripId: itemData.tripId,
+        type: itemData.type,
+        title: itemData.title,
+        details: itemData.details,
+        provider: itemData.provider || null,
+        price: typeof itemData.price === 'number' ? itemData.price : (parseInt(String(itemData.price)) || 0),
+        included: itemData.included ?? true,
+        dayNumber: itemData.dayNumber || null
+      };
+      
+      this.cartItems.set(id, item);
+      items.push(item);
+    }
+    
+    console.log(`[Storage] Created ${items.length} cart items in batch`);
+    return items;
   }
 
   async updateCartItem(id: string, updates: Partial<CartItem>): Promise<CartItem | undefined> {

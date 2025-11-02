@@ -3,10 +3,15 @@ import { useTripStore } from "@/hooks/use-trip-store";
 import { Button } from "@/components/ui/button";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 
 export default function Cart() {
   const { cartItems, setCartItems, getTotalCost, currentTrip, upgradeAdded, setUpgradeAdded } = useTripStore();
   const queryClient = useQueryClient();
+  const paymentSectionRef = useRef<HTMLDivElement | null>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
+  const [isAtPaymentBottom, setIsAtPaymentBottom] = useState(false);
 
   const removeItemMutation = useMutation({
     mutationFn: (itemId: string) => api.deleteCartItem(itemId),
@@ -32,9 +37,47 @@ export default function Cart() {
   const upgradePrice = 480;
   const finalTotal = totalCost - priceBreakdown.discount + priceBreakdown.taxes + (upgradeAdded ? upgradePrice : 0);
 
+  // Handle scroll to detect when we're at the bottom of payment section
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!mainRef.current || !paymentSectionRef.current) return;
+
+      const mainElement = mainRef.current;
+      const paymentElement = paymentSectionRef.current;
+      
+      // Get scroll position and element positions
+      const scrollTop = mainElement.scrollTop;
+      const mainHeight = mainElement.scrollHeight;
+      const mainClientHeight = mainElement.clientHeight;
+      const paymentRect = paymentElement.getBoundingClientRect();
+      const mainRect = mainElement.getBoundingClientRect();
+      
+      // Calculate if payment section is at or near the bottom of viewport
+      // We consider "at bottom" when payment section bottom is visible and close to bottom of main container
+      const paymentBottomRelativeToMain = paymentRect.bottom - mainRect.top;
+      const distanceFromBottom = mainClientHeight - paymentBottomRelativeToMain;
+      
+      // If payment section is within 100px from bottom of viewport, move upgrade above it
+      const shouldMoveAbovePayment = distanceFromBottom <= 100 && distanceFromBottom >= -20;
+      
+      setIsAtPaymentBottom(shouldMoveAbovePayment);
+    };
+
+    const mainElement = mainRef.current;
+    if (mainElement) {
+      mainElement.addEventListener('scroll', handleScroll);
+      // Check initial position
+      handleScroll();
+      
+      return () => {
+        mainElement.removeEventListener('scroll', handleScroll);
+      };
+    }
+  }, [includedItems.length]);
+
   return (
     <>
-      <main className="flex-grow overflow-y-auto custom-scrollbar p-6 relative pb-32">
+      <main ref={mainRef} className="flex-grow overflow-y-auto custom-scrollbar p-6 relative pb-32">
         {/* Header */}
         <header className="text-center mb-6">
           <ShoppingCart className="w-8 h-8 text-primary mx-auto mb-2" />
@@ -130,7 +173,7 @@ export default function Cart() {
           </div>
 
           {/* Checkout Button with Total Cost */}
-          <div className="mt-8">
+          <div ref={paymentSectionRef} className="mt-8">
             <Button
               className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold py-4 px-6 shadow-lg transition-all duration-200 transform hover:scale-[1.02] hover:shadow-xl flex items-center justify-between"
               data-testid="checkout-button"
@@ -141,21 +184,21 @@ export default function Cart() {
               </span>
               <span className="text-xl font-bold" data-testid="checkout-total-cost">₹{finalTotal}</span>
             </Button>
-          </div>
 
-          {/* Trust Indicators */}
-          <div className="flex items-center justify-center space-x-4 mt-4 text-xs text-muted-foreground">
-            <div className="flex items-center">
-              <Shield className="w-3 h-3 mr-1" />
-              Secure Payment
-            </div>
-            <div className="flex items-center">
-              <RotateCcw className="w-3 h-3 mr-1" />
-              Free Cancellation
-            </div>
-            <div className="flex items-center">
-              <Phone className="w-3 h-3 mr-1" />
-              24/7 Support
+            {/* Trust Indicators */}
+            <div className="flex items-center justify-center space-x-4 mt-4 text-xs text-muted-foreground">
+              <div className="flex items-center">
+                <Shield className="w-3 h-3 mr-1" />
+                Secure Payment
+              </div>
+              <div className="flex items-center">
+                <RotateCcw className="w-3 h-3 mr-1" />
+                Free Cancellation
+              </div>
+              <div className="flex items-center">
+                <Phone className="w-3 h-3 mr-1" />
+                24/7 Support
+              </div>
             </div>
           </div>
 
@@ -164,25 +207,32 @@ export default function Cart() {
       </main>
 
       {includedItems.length > 0 && (
-        <div className="fixed left-0 bottom-24 z-30 pointer-events-none">
-          <div className="ml-2 pointer-events-auto w-[220px] rounded-2xl border-2 border-secondary/30 bg-gradient-to-br from-card/85 to-card/70 backdrop-blur-md shadow-2xl hover:shadow-secondary/20 transition-all duration-300 hover:scale-105">
-            <div className="p-3.5">
-              <div className="flex items-start gap-2 mb-2">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-secondary/20 to-secondary/10 flex items-center justify-center">
-                  <Gem className="w-4 h-4 text-secondary" />
+        <div 
+          className={cn(
+            "fixed z-30 pointer-events-none transition-all duration-300",
+            isAtPaymentBottom 
+              ? "bottom-0 left-1/2 -translate-x-1/2 mb-2" 
+              : "bottom-24 left-1/2 -translate-x-1/2"
+          )}
+        >
+          <div className="pointer-events-auto w-[280px] sm:w-[320px] rounded-2xl border-2 border-secondary/30 bg-gradient-to-br from-card/85 to-card/70 backdrop-blur-md shadow-2xl hover:shadow-secondary/20 transition-all duration-300 hover:scale-105">
+            <div className="p-2.5">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-secondary/20 to-secondary/10 flex items-center justify-center flex-shrink-0">
+                  <Gem className="w-3 h-3 text-secondary" />
                 </div>
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-foreground">Upgrade Your Experience</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-foreground">EaseMyPlan Premium+</p>
                 </div>
               </div>
-              <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
-                Premium Ocean View Suite with balcony & butler
+              <p className="text-[10px] text-muted-foreground mb-2 leading-snug line-clamp-2">
+                Get round-the-clock assistance and a dedicated travel advisor for personalized care throughout your journey
               </p>
-              <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
+              <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-border/40">
                 <span className="text-xs text-muted-foreground font-semibold">+₹{upgradePrice}</span>
                 <Button
                   size="sm"
-                  className="bg-gradient-to-r from-secondary to-secondary/90 hover:from-secondary/90 hover:to-secondary text-secondary-foreground text-[11px] font-bold py-1.5 px-3 h-auto rounded-full shadow-lg hover:shadow-xl transition-all"
+                  className="bg-gradient-to-r from-secondary to-secondary/90 hover:from-secondary/90 hover:to-secondary text-secondary-foreground text-[10px] font-bold py-1 px-2.5 h-auto rounded-full shadow-lg hover:shadow-xl transition-all"
                   data-testid="add-upgrade-button"
                   onClick={() => setUpgradeAdded(!upgradeAdded)}
                 >

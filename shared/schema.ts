@@ -69,6 +69,17 @@ export const tripRequestSchema = z.object({
   endDate: z.string().min(1),
   theme: z.string().min(1),
   budget: z.number().min(10000).max(500000),
+  travelers: z.object({
+    adults: z.number().min(1).max(20),
+    children: z.number().min(0).max(20),
+  }).optional(),
+  customRequest: z.string().optional(),
+  advancedOptions: z.object({
+    selectAll: z.boolean().optional(),
+    includeFlights: z.boolean().optional(),
+    autoBook: z.boolean().optional(),
+    localRecommendations: z.boolean().optional(),
+  }).optional(),
 });
 
 export type TripRequest = z.infer<typeof tripRequestSchema>;

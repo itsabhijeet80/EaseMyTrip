@@ -18,6 +18,7 @@ interface TripStore {
   pendingAction: PendingAction | null;
   modificationHistory: any[];
   upgradeAdded: boolean;
+  viewMode: 'mobile' | 'desktop';
   
   setCurrentTrip: (trip: Trip | null) => void;
   setCartItems: (items: CartItem[]) => void;
@@ -27,6 +28,7 @@ interface TripStore {
   setSelectedDay: (day: number) => void;
   setPendingAction: (action: PendingAction | null) => void;
   setUpgradeAdded: (added: boolean) => void;
+  setViewMode: (mode: 'mobile' | 'desktop') => void;
   
   updateCartItem: (id: string, updates: Partial<CartItem>) => void;
   removeCartItem: (id: string) => void;
@@ -47,6 +49,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
   pendingAction: null,
   modificationHistory: [],
   upgradeAdded: false,
+  viewMode: 'mobile',
   
   setCurrentTrip: (trip) => set({ currentTrip: trip }),
   setCartItems: (items) => set({ cartItems: items }),
@@ -56,6 +59,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
   setSelectedDay: (day) => set({ selectedDay: day }),
   setPendingAction: (action) => set({ pendingAction: action }),
   setUpgradeAdded: (added) => set({ upgradeAdded: added }),
+  setViewMode: (mode) => set({ viewMode: mode }),
   
   updateCartItem: (id, updates) => set((state) => ({
     cartItems: state.cartItems.map(item => 
